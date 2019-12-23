@@ -21,19 +21,25 @@ Parameters:
     Default: RancherServer
     AllowedPattern: '[a-zA-Z0-9]*'
     ConstraintDescription: must be a valid name without spaces.
-  RancherPort:
-    Description: The Rancher server port
-    Type: String
-    Default: '8080'
-    AllowedPattern: '^[1-9][0-9]{2,4}$'
-    ConstraintDescription: must be a valid port number.
-  RancherVolumeSize:
+  RancherInstanceVolumeSize:
     Description: The size of the volume (GB)
     Type: Number
     Default: '16'
     MinValue: '1'
     MaxValue: '1024'
     ConstraintDescription: must be between 1 and 1024 GB.
+  RancherPort:
+    Description: The Rancher server port
+    Type: String
+    Default: '8080'
+    AllowedPattern: '^[1-9][0-9]{2,4}$'
+    ConstraintDescription: must be a valid port number.
+  RancherVersion:
+    Description: The Rancher version
+    Type: String
+    Default: v1.6.25
+    AllowedPattern: '^v[0-9]+\.[0-9]+\.[0-9]+$'
+    ConstraintDescription: must be a valid port number.
   DatabasePassword:
     Description: The database admin account password
     Type: String
@@ -157,9 +163,33 @@ Resources:
     Properties:
       UserData: !Base64
         'Fn::Join':
-          - ''
-          - - IPAddress=
-            - !Ref IPAddress
+          - |
+          - - '#!/bin/bash'
+            - !Join
+              - ' '
+              - - 'sudo docker run -d --name rancher-server --restart=unless-stopped -p'
+                - !Join
+                  - ':'
+                  - - !Ref RancherPort
+                    - '8080'
+                - !Join
+                  - ':'
+                  - - rancher/server
+                    - !Ref RancherVersion
+                - '--db-pass'
+                - !Ref DatabasePassword
+                - '--db-user'
+                - !Ref DatabaseUser
+                - '--db-name'
+                - !Ref DatabaseName
+                - '--db-port'
+                - !GetAtt
+                  - DatabaseMasterInstance
+                  - Endpoint.Port
+                - '--db-host'
+                - !GetAtt
+                  - DatabaseMasterInstance
+                  - Endpoint.Address
       InstanceType: !Ref RancherInstanceType
       SecurityGroups:
         - !Ref RancherSecurityGroup
@@ -175,7 +205,7 @@ Resources:
         - DeviceName: /dev/sda1
           Ebs:
             VolumeType: gp2
-            VolumeSize: !Ref RancherVolumeSize
+            VolumeSize: !Ref RancherInstanceVolumeSize
             DeleteOnTermination: true
   RancherSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -206,8 +236,8 @@ Resources:
           ToPort: '80'
           CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
-          FromPort: '8080'
-          ToPort: '8080'
+          FromPort: !Ref RancherPort
+          ToPort: !Ref RancherPort
           CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: '443'
@@ -326,7 +356,8 @@ Outputs:
       - ''
       - - 'http://'
         - !Ref IPAddress
-        - ':8080/'
+        - ':'
+        - !Ref RancherPort
   RancherPublicDNS:
     Description: Public host name of the Rancher server
     Value: !GetAtt
