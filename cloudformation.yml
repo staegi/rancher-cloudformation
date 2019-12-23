@@ -355,16 +355,16 @@ Outputs:
     Value: !Join
       - ''
       - - 'http://'
-        - !Ref IPAddress
+        - !GetAtt
+          - RancherInstance
+          - PublicDnsName
         - ':'
         - !Ref RancherPort
-  RancherPublicDNS:
-    Description: Public host name of the Rancher server
-    Value: !GetAtt
-      - RancherInstance
-      - PublicDnsName
+  RancherIP:
+    Description: Public IP of the Rancher server
+    Value: !Ref IPAddress
   S3BucketURL:
-    Description: Name of S3 bucket to hold website content
+    Description: URL of the S3 bucket
     Value: !Join
       - ''
       - - 'https://'
@@ -387,11 +387,11 @@ Outputs:
         - efs
         - !Ref 'AWS::Region'
         - amazonaws.com
-  JDBCConnectionString:
-    Description: JDBC connection string for the master database
+  DBConnectionString:
+    Description: Database connection string for the master database
     Value: !Join
       - ''
-      - - 'jdbc:mysql://'
+      - - 'mysql://'
         - !GetAtt
           - DatabaseMasterInstance
           - Endpoint.Address
