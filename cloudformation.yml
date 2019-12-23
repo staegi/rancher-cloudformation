@@ -168,6 +168,9 @@ Resources:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: Rancher
+      Tags:
+        - Key: Name
+          Value: Rancher
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: '22'
@@ -203,6 +206,10 @@ Resources:
           CidrIp: 0.0.0.0/0
   IPAddress:
     Type: 'AWS::EC2::EIP'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: Rancher
   IPAssoc:
     Type: 'AWS::EC2::EIPAssociation'
     Properties:
@@ -212,6 +219,9 @@ Resources:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: Database
+      Tags:
+        - Key: Name
+          Value: Database
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: '3306'
@@ -237,16 +247,13 @@ Resources:
           - DatabaseSecurityGroup
           - GroupId
     DeletionPolicy: Snapshot
-  DatabaseReplicaInstance:
-    Type: 'AWS::RDS::DBInstance'
-    Properties:
-      SourceDBInstanceIdentifier: !Ref DatabaseMasterInstance
-      DBInstanceClass: !Ref DatabaseInstanceClass
   Bucket:
     Type: 'AWS::S3::Bucket'
     DeletionPolicy: Retain
     Properties:
       BucketName: !Ref BucketName
+  BucketGroup:
+    Type: 'AWS::IAM::Group'
   BucketPolicy:
     Type: 'AWS::IAM::Policy'
     Properties:
@@ -276,6 +283,18 @@ Resources:
               - - 'arn:aws:s3:::'
                 - !Ref BucketName
                 - /*
+      Groups:
+        - !Ref BucketGroup
+  BucketUser:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: bucket
+      Groups:
+        - !Ref BucketGroup
+  BucketKey:
+    Type: 'AWS::IAM::AccessKey'
+    Properties:
+      UserName: !Ref BucketUser
   FileSystem:
     Type: 'AWS::EFS::FileSystem'
     DeletionPolicy: Retain
@@ -289,12 +308,17 @@ Resources:
       ThroughputMode: provisioned
 Outputs:
   RancherURL:
-    Description: URL of the newly created Rancher server
+    Description: URL of the Rancher server
     Value: !Join
       - ''
       - - 'http://'
         - !Ref IPAddress
         - ':8080/'
+  RancherPublicDNS:
+    Description: Public host name of the Rancher server
+    Value: !GetAtt
+      - RancherInstance
+      - PublicDnsName
   S3BucketURL:
     Description: Name of S3 bucket to hold website content
     Value: !Join
@@ -303,12 +327,23 @@ Outputs:
         - !GetAtt
           - Bucket
           - DomainName
-  FileSystemDomain:
-    Description: Domain name of the NFS file system
+  S3BucketAccessKey:
+    Description: Access key of the S3 bucket user
+    Value: !Ref BucketKey
+  S3BucketSecretKey:
+    Description: Secret key of the S3 bucket user
     Value: !GetAtt
-      - FileSystem
-      - DNSName
-  MasterJDBCConnectionString:
+      - BucketKey
+      - SecretAccessKey
+  NFSDomain:
+    Description: Domain name of the NFS file system
+    Value: !Join
+      - .
+      - - !Ref FileSystem
+        - efs
+        - !Ref 'AWS::Region'
+        - amazon.com
+  JDBCConnectionString:
     Description: JDBC connection string for the master database
     Value: !Join
       - ''
