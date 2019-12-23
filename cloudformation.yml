@@ -27,6 +27,13 @@ Parameters:
     Default: '8080'
     AllowedPattern: '^[1-9][0-9]{2,4}$'
     ConstraintDescription: must be a valid port number.
+  RancherVolumeSize:
+    Description: The size of the volume (GB)
+    Type: Number
+    Default: '16'
+    MinValue: '1'
+    MaxValue: '1024'
+    ConstraintDescription: must be between 1 and 1024 GB.
   DatabasePassword:
     Description: The database admin account password
     Type: String
@@ -164,6 +171,12 @@ Resources:
       Tags:
         - Key: Name
           Value: !Ref RancherInstanceName
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: !Ref RancherVolumeSize
+            DeleteOnTermination: true
   RancherSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -342,7 +355,7 @@ Outputs:
       - - !Ref FileSystem
         - efs
         - !Ref 'AWS::Region'
-        - amazon.com
+        - amazonaws.com
   JDBCConnectionString:
     Description: JDBC connection string for the master database
     Value: !Join
