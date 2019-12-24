@@ -40,7 +40,7 @@ Parameters:
     Default: v1.6.25
     AllowedPattern: '^v[0-9]+\.[0-9]+\.[0-9]+$'
     ConstraintDescription: must be a valid port number.
-  DatabasePassword:
+  DatabaseAdminPassword:
     Description: The database admin account password
     Type: String
     NoEcho: 'true'
@@ -48,7 +48,7 @@ Parameters:
     MaxLength: '41'
     AllowedPattern: '[a-zA-Z0-9]*'
     ConstraintDescription: must contain only alphanumeric characters.
-  DatabaseUser:
+  DatabaseAdminUser:
     Description: The database admin account username
     Type: String
     Default: admin
@@ -163,23 +163,26 @@ Resources:
     Properties:
       UserData: !Base64
         'Fn::Join':
-          - |
-          - - '#!/bin/bash'
+          - ''
+          - - |
+              #!/bin/bash
             - !Join
               - ' '
-              - - 'sudo docker run -d --name rancher-server --restart=unless-stopped -p'
+              - - sudo docker run -d -p
                 - !Join
                   - ':'
                   - - !Ref RancherPort
                     - '8080'
+                - '--name rancher-server'
+                - '--restart=unless-stopped'
                 - !Join
                   - ':'
                   - - rancher/server
                     - !Ref RancherVersion
                 - '--db-pass'
-                - !Ref DatabasePassword
+                - !Ref DatabaseAdminPassword
                 - '--db-user'
-                - !Ref DatabaseUser
+                - !Ref DatabaseAdminUser
                 - '--db-name'
                 - !Ref DatabaseName
                 - '--db-port'
@@ -280,8 +283,8 @@ Resources:
       StorageType: gp2
       DeletionProtection: !Ref DeletionProtection
       DBName: !Ref DatabaseName
-      MasterUsername: !Ref DatabaseUser
-      MasterUserPassword: !Ref DatabasePassword
+      MasterUsername: !Ref DatabaseAdminUser
+      MasterUserPassword: !Ref DatabaseAdminPassword
       AllocatedStorage: !Ref DatabaseAllocatedStorage
       DBInstanceClass: !Ref DatabaseInstanceClass
       DBInstanceIdentifier: !Ref DatabaseInstanceIdentifier
