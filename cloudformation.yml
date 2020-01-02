@@ -143,10 +143,26 @@ Resources:
         'Fn::Join':
           - ''
           - - |
-              #!/bin/bash
+              #cloud-config
+            - |
+              rancher:
+            - |
+              write_files:
+            - |
+              - path: /etc/rc.local
+            - |2
+                permissions: "0755"
+            - |2
+                owner: root
+            - |2
+                content: |
+            - |2
+                  #!/bin/bash
+            - |2
+                  wait-for-docker
             - !Join
               - ' '
-              - - sudo docker run -d -p
+              - - '    docker run -d -p'
                 - !Join
                   - ':'
                   - - !Ref RancherPort
