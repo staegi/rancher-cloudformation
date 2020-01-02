@@ -19,13 +19,6 @@
             ],
             "ConstraintDescription": "must be a valid EC2 instance type."
         },
-        "RancherInstanceName": {
-            "Description": "The Rancher server name",
-            "Type": "String",
-            "Default": "RancherServer",
-            "AllowedPattern": "[a-zA-Z0-9]*",
-            "ConstraintDescription": "must be a valid name without spaces."
-        },
         "RancherInstanceVolumeSize": {
             "Description": "The size of the volume (GB)",
             "Type": "Number",
@@ -83,15 +76,6 @@
             "AllowedPattern": "[a-z\\-]*",
             "ConstraintDescription": "must contain only lowercase characters."
         },
-        "DatabaseInstanceIdentifier": {
-            "Description": "The identifer of the database instance",
-            "Type": "String",
-            "Default": "rancher",
-            "MinLength": "1",
-            "MaxLength": "41",
-            "AllowedPattern": "[a-z\\-]*",
-            "ConstraintDescription": "must contain only lowercase characters."
-        },
         "DatabaseInstanceClass": {
             "Description": "The database instance class",
             "Type": "String",
@@ -122,15 +106,6 @@
             "AllowedPattern": "[0-9a-z\\-]*",
             "ConstraintDescription": "must contain only lowercase characters, digits and minus signs."
         },
-        "FileSystemName": {
-            "Description": "The name of the file system",
-            "Type": "String",
-            "Default": "rancher",
-            "MinLength": "1",
-            "MaxLength": "41",
-            "AllowedPattern": "[a-z\\-]*",
-            "ConstraintDescription": "must contain only lowercase characters."
-        },
         "FileSystemThroughput": {
             "Description": "The throughput of the file system",
             "Type": "Number",
@@ -143,58 +118,58 @@
     "Mappings": {
         "AWSRegion2AMI": {
             "eu-north-1": {
-                "AMI": "ami-008be767228de6683"
+                "AMI": "ami-02c60b1d15cfdb395"
             },
             "ap-south-1": {
-                "AMI": "ami-06d0903ccdd125c0c"
+                "AMI": "ami-03c6826f71f10a89d"
             },
             "eu-west-3": {
-                "AMI": "ami-0cbb2f6862669fe62"
+                "AMI": "ami-08f81096c8ca76b8c"
             },
             "eu-west-2": {
-                "AMI": "ami-0d5ce579aeef247e6"
+                "AMI": "ami-0a9b760b7f5743662"
             },
             "eu-west-1": {
-                "AMI": "ami-0f48831932827ad91"
+                "AMI": "ami-0985b29f1ceb02183"
             },
             "ap-northeast-2": {
-                "AMI": "ami-0fcc552e7ee5cb04c"
+                "AMI": "ami-05a24d2c2ae2ff01c"
             },
             "ap-northeast-1": {
-                "AMI": "ami-082e73823959a006f"
+                "AMI": "ami-0faebbe4fa02127b9"
             },
             "sa-east-1": {
-                "AMI": "ami-0613568e5abe888e8"
+                "AMI": "ami-01872ab8569bde461"
             },
             "ca-central-1": {
-                "AMI": "ami-0fe07f3c02d7e1b73"
+                "AMI": "ami-00b399e6eafdbe50b"
             },
             "ap-southeast-1": {
-                "AMI": "ami-0dc36da6fc839e3b4"
+                "AMI": "ami-0b8a7192b0dc07709"
             },
             "ap-southeast-2": {
-                "AMI": "ami-0d1e30aed40a09e7a"
+                "AMI": "ami-058f3d6c035b8d6d1"
             },
             "eu-central-1": {
-                "AMI": "ami-0079d316193c1c1f2"
+                "AMI": "ami-0b31348605bf75c44"
             },
             "us-east-1": {
-                "AMI": "ami-03383c16defb1ed02"
+                "AMI": "ami-085b489bb4756f126"
             },
             "us-east-2": {
-                "AMI": "ami-0ebe6ed6e656d9aa9"
+                "AMI": "ami-002ab867b8b8591d5"
             },
             "us-west-1": {
-                "AMI": "ami-09b8160a9edaeb22a"
+                "AMI": "ami-0f3cd370f66d772c4"
             },
             "us-west-2": {
-                "AMI": "ami-0d554a1dd1d4ed527"
+                "AMI": "ami-04a8b7119cc82a3b2"
             },
             "cn-north-1": {
-                "AMI": "ami-025d9b43810675e5f"
+                "AMI": "ami-0048342c054fb5a3e"
             },
             "cn-northwest-1": {
-                "AMI": "ami-00be191a22f30767e"
+                "AMI": "ami-0b0f6c8524c8ec27c"
             }
         }
     },
@@ -207,12 +182,20 @@
                         "Fn::Join": [
                             "",
                             [
-                                "#!/bin/bash\n",
+                                "#cloud-config\n",
+                                "rancher:\n",
+                                "write_files:\n",
+                                "- path: /etc/rc.local\n",
+                                "  permissions: \"0755\"\n",
+                                "  owner: root\n",
+                                "  content: |\n",
+                                "    #!/bin/bash\n",
+                                "    wait-for-docker\n",
                                 {
                                     "Fn::Join": [
                                         " ",
                                         [
-                                            "sudo docker run -d -p",
+                                            "    docker run -d -p",
                                             {
                                                 "Fn::Join": [
                                                     ":",
@@ -294,7 +277,7 @@
                     {
                         "Key": "Name",
                         "Value": {
-                            "Ref": "RancherInstanceName"
+                            "Fn::Sub": "${AWS::StackName}-rancher-server"
                         }
                     }
                 ],
@@ -447,7 +430,7 @@
                     "Ref": "DatabaseInstanceClass"
                 },
                 "DBInstanceIdentifier": {
-                    "Ref": "DatabaseInstanceIdentifier"
+                    "Fn::Sub": "${AWS::StackName}-rancher"
                 },
                 "VPCSecurityGroups": [
                     {
@@ -476,15 +459,7 @@
             "Type": "AWS::IAM::Policy",
             "Properties": {
                 "PolicyName": {
-                    "Fn::Join": [
-                        "",
-                        [
-                            "AmazonS3FullAccess-",
-                            {
-                                "Ref": "BucketName"
-                            }
-                        ]
-                    ]
+                    "Fn::Sub": "AmazonS3FullAccess-${BucketName}"
                 },
                 "PolicyDocument": {
                     "Version": "2012-10-17",
@@ -503,31 +478,14 @@
                                 "s3:ListBuckets"
                             ],
                             "Resource": {
-                                "Fn::Join": [
-                                    "",
-                                    [
-                                        "arn:aws:s3:::",
-                                        {
-                                            "Ref": "BucketName"
-                                        }
-                                    ]
-                                ]
+                                "Fn::Sub": "arn:aws:s3:::${BucketName}"
                             }
                         },
                         {
                             "Effect": "Allow",
                             "Action": "s3:*",
                             "Resource": {
-                                "Fn::Join": [
-                                    "",
-                                    [
-                                        "arn:aws:s3:::",
-                                        {
-                                            "Ref": "BucketName"
-                                        },
-                                        "/*"
-                                    ]
-                                ]
+                                "Fn::Sub": "arn:aws:s3:::${BucketName}/*"
                             }
                         }
                     ]
@@ -567,7 +525,7 @@
                     {
                         "Key": "Name",
                         "Value": {
-                            "Ref": "FileSystemName"
+                            "Fn::Sub": "${AWS::StackName}-rancher"
                         }
                     }
                 ],
@@ -642,19 +600,7 @@
         "NFSDomain": {
             "Description": "Domain name of the NFS file system",
             "Value": {
-                "Fn::Join": [
-                    ".",
-                    [
-                        {
-                            "Ref": "FileSystem"
-                        },
-                        "efs",
-                        {
-                            "Ref": "AWS::Region"
-                        },
-                        "amazonaws.com"
-                    ]
-                ]
+                "Fn::Sub": "${FileSystem}.efs.${AWS::Region}.${AWS::URLSuffix}"
             }
         },
         "DBConnectionString": {

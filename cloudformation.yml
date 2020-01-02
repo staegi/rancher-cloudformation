@@ -181,10 +181,7 @@ Resources:
         - AMI
       Tags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref 'AWS::StackName'
-              - RancherServer
+          Value: !Sub '${AWS::StackName}-rancher-server'
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -268,10 +265,7 @@ Resources:
       MasterUserPassword: !Ref DatabaseAdminPassword
       AllocatedStorage: !Ref DatabaseAllocatedStorage
       DBInstanceClass: !Ref DatabaseInstanceClass
-      DBInstanceIdentifier: !Join
-        - '-'
-        - - !Ref 'AWS::StackName'
-          - rancher
+      DBInstanceIdentifier: !Sub '${AWS::StackName}-rancher'
       VPCSecurityGroups:
         - !GetAtt
           - DatabaseSecurityGroup
@@ -287,10 +281,7 @@ Resources:
   BucketPolicy:
     Type: 'AWS::IAM::Policy'
     Properties:
-      PolicyName: !Join
-        - ''
-        - - AmazonS3FullAccess-
-          - !Ref BucketName
+      PolicyName: !Sub 'AmazonS3FullAccess-${BucketName}'
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -302,17 +293,10 @@ Resources:
           - Effect: Allow
             Action:
               - 's3:ListBuckets'
-            Resource: !Join
-              - ''
-              - - 'arn:aws:s3:::'
-                - !Ref BucketName
+            Resource: !Sub 'arn:aws:s3:::${BucketName}'
           - Effect: Allow
             Action: 's3:*'
-            Resource: !Join
-              - ''
-              - - 'arn:aws:s3:::'
-                - !Ref BucketName
-                - /*
+            Resource: !Sub 'arn:aws:s3:::${BucketName}/*'
       Groups:
         - !Ref BucketGroup
   BucketUser:
@@ -332,10 +316,7 @@ Resources:
       Encrypted: true
       FileSystemTags:
         - Key: Name
-          Value: !Join
-            - '-'
-            - - !Ref 'AWS::StackName'
-              - rancher
+          Value: !Sub '${AWS::StackName}-rancher'
       PerformanceMode: generalPurpose
       ProvisionedThroughputInMibps: !Ref FileSystemThroughput
       ThroughputMode: provisioned
@@ -371,12 +352,7 @@ Outputs:
       - SecretAccessKey
   NFSDomain:
     Description: Domain name of the NFS file system
-    Value: !Join
-      - .
-      - - !Ref FileSystem
-        - efs
-        - !Ref 'AWS::Region'
-        - !Ref 'AWS::URLSuffix'
+    Value: !Sub '${FileSystem}.efs.${AWS::Region}.${AWS::URLSuffix}'
   DBConnectionString:
     Description: Database connection string for the master database
     Value: !Join
