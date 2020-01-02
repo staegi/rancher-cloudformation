@@ -15,12 +15,6 @@ Parameters:
       - t2.large
       - t2.xlarge
     ConstraintDescription: must be a valid EC2 instance type.
-  RancherInstanceName:
-    Description: The Rancher server name
-    Type: String
-    Default: RancherServer
-    AllowedPattern: '[a-zA-Z0-9]*'
-    ConstraintDescription: must be a valid name without spaces.
   RancherInstanceVolumeSize:
     Description: The size of the volume (GB)
     Type: Number
@@ -71,14 +65,6 @@ Parameters:
     MaxLength: '41'
     AllowedPattern: '[a-z\-]*'
     ConstraintDescription: must contain only lowercase characters.
-  DatabaseInstanceIdentifier:
-    Description: The identifer of the database instance
-    Type: String
-    Default: rancher
-    MinLength: '1'
-    MaxLength: '41'
-    AllowedPattern: '[a-z\-]*'
-    ConstraintDescription: must contain only lowercase characters.
   DatabaseInstanceClass:
     Description: The database instance class
     Type: String
@@ -104,14 +90,6 @@ Parameters:
     MaxLength: '41'
     AllowedPattern: '[0-9a-z\-]*'
     ConstraintDescription: 'must contain only lowercase characters, digits and minus signs.'
-  FileSystemName:
-    Description: The name of the file system
-    Type: String
-    Default: rancher
-    MinLength: '1'
-    MaxLength: '41'
-    AllowedPattern: '[a-z\-]*'
-    ConstraintDescription: must contain only lowercase characters.
   FileSystemThroughput:
     Description: The throughput of the file system
     Type: Number
@@ -203,7 +181,10 @@ Resources:
         - AMI
       Tags:
         - Key: Name
-          Value: !Ref RancherInstanceName
+          Value: !Join
+            - '-'
+            - - !Ref 'AWS::StackName'
+              - RancherServer
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -287,7 +268,10 @@ Resources:
       MasterUserPassword: !Ref DatabaseAdminPassword
       AllocatedStorage: !Ref DatabaseAllocatedStorage
       DBInstanceClass: !Ref DatabaseInstanceClass
-      DBInstanceIdentifier: !Ref DatabaseInstanceIdentifier
+      DBInstanceIdentifier: !Join
+        - '-'
+        - - !Ref 'AWS::StackName'
+          - rancher
       VPCSecurityGroups:
         - !GetAtt
           - DatabaseSecurityGroup
@@ -348,7 +332,10 @@ Resources:
       Encrypted: true
       FileSystemTags:
         - Key: Name
-          Value: !Ref FileSystemName
+          Value: !Join
+            - '-'
+            - - !Ref 'AWS::StackName'
+              - rancher
       PerformanceMode: generalPurpose
       ProvisionedThroughputInMibps: !Ref FileSystemThroughput
       ThroughputMode: provisioned
@@ -389,7 +376,7 @@ Outputs:
       - - !Ref FileSystem
         - efs
         - !Ref 'AWS::Region'
-        - amazonaws.com
+        - !Ref 'AWS::URLSuffix'
   DBConnectionString:
     Description: Database connection string for the master database
     Value: !Join
