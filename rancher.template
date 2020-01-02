@@ -35,7 +35,7 @@
             "ConstraintDescription": "must be a valid port number."
         },
         "RancherVersion": {
-            "Description": "The Rancher version",
+            "Description": "The Rancher server version",
             "Type": "String",
             "Default": "v1.6.25",
             "AllowedPattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
@@ -89,7 +89,7 @@
             "ConstraintDescription": "must select a valid database instance type."
         },
         "DeletionProtection": {
-            "Description": "The value whether deletion protection is enabled",
+            "Description": "The value whether deletion protection is enabled for database and Rancher server",
             "Type": "String",
             "Default": true,
             "AllowedValues": [
@@ -292,7 +292,10 @@
                             "DeleteOnTermination": true
                         }
                     }
-                ]
+                ],
+                "DisableApiTermination": {
+                    "Ref": "DeletionProtection"
+                }
             }
         },
         "RancherSecurityGroup": {
