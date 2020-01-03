@@ -75,14 +75,6 @@ Parameters:
       - db.t2.large
       - db.t2.xlarge
     ConstraintDescription: must select a valid database instance type.
-  DeletionProtection:
-    Description: The value whether deletion protection is enabled for database and Rancher server
-    Type: String
-    Default: true
-    AllowedValues:
-      - true
-      - false
-    ConstraintDescription: must contain a false or true
   BucketName:
     Description: The name of the bucket
     Type: String
@@ -142,54 +134,18 @@ Resources:
       AvailabilityZone: !Select
         - 0
         - Fn::GetAZs: !Ref 'AWS::Region'
-      UserData: !Base64
-        'Fn::Join':
-          - ''
-          - - |
-              #cloud-config
-            - |
-              rancher:
-            - |
-              write_files:
-            - |
-              - path: /etc/rc.local
-            - |2
-                permissions: "0755"
-            - |2
-                owner: root
-            - |2
-                content: |
-            - |2
-                  #!/bin/bash
-            - |2
-                  wait-for-docker
-            - !Join
-              - ' '
-              - - '    docker run -d -p'
-                - !Join
-                  - ':'
-                  - - !Ref RancherPort
-                    - '8080'
-                - '--name rancher-server'
-                - '--restart=unless-stopped'
-                - !Join
-                  - ':'
-                  - - rancher/server
-                    - !Ref RancherVersion
-                - '--db-pass'
-                - !Ref DatabaseAdminPassword
-                - '--db-user'
-                - !Ref DatabaseAdminUser
-                - '--db-name'
-                - !Ref DatabaseName
-                - '--db-port'
-                - !GetAtt
-                  - DatabaseMasterInstance
-                  - Endpoint.Port
-                - '--db-host'
-                - !GetAtt
-                  - DatabaseMasterInstance
-                  - Endpoint.Address
+      UserData:
+        'Fn::Base64': !Sub |
+          #cloud-config
+          rancher:
+          write_files:
+          - path: /etc/rc.local
+            permissions: "0755"
+            owner: root
+            content: |
+              #!/bin/bash
+              wait-for-docker
+              docker run -d -p ${RancherPort}:8080 --name rancher-server --restart=unless-stopped rancher/server:${RancherVersion} --db-pass ${DatabaseAdminPassword} --db-user ${DatabaseAdminUser} --db-name ${DatabaseName} --db-port ${DatabaseMasterInstance.Endpoint.Port} --db-host ${DatabaseMasterInstance.Endpoint.Address}
       InstanceType: !Ref RancherInstanceType
       SecurityGroups:
         - !Ref RancherSecurityGroup
@@ -207,7 +163,6 @@ Resources:
             VolumeType: gp2
             VolumeSize: !Ref RancherInstanceVolumeSize
             DeleteOnTermination: true
-      DisableApiTermination: !Ref DeletionProtection
   RancherSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -279,13 +234,12 @@ Resources:
       EngineVersion: 5.7
       StorageEncrypted: true
       StorageType: gp2
-      DeletionProtection: !Ref DeletionProtection
       DBName: !Ref DatabaseName
       MasterUsername: !Ref DatabaseAdminUser
       MasterUserPassword: !Ref DatabaseAdminPassword
       AllocatedStorage: !Ref DatabaseAllocatedStorage
       DBInstanceClass: !Ref DatabaseInstanceClass
-      DBInstanceIdentifier: !Sub '${AWS::StackName}-rancher'
+      DBInstanceIdentifier: !Ref 'AWS::StackName'
       VPCSecurityGroups:
         - !GetAtt
           - DatabaseSecurityGroup
@@ -322,7 +276,7 @@ Resources:
   BucketUser:
     Type: 'AWS::IAM::User'
     Properties:
-      UserName: bucket
+      UserName: !Sub '${AWS::StackName}-bucket'
       Groups:
         - !Ref BucketGroup
   BucketKey:
@@ -336,32 +290,20 @@ Resources:
       Encrypted: true
       FileSystemTags:
         - Key: Name
-          Value: !Sub '${AWS::StackName}-rancher'
+          Value: !Ref 'AWS::StackName'
       PerformanceMode: generalPurpose
       ProvisionedThroughputInMibps: !Ref FileSystemThroughput
       ThroughputMode: provisioned
 Outputs:
   RancherURL:
     Description: URL of the Rancher server
-    Value: !Join
-      - ''
-      - - 'http://'
-        - !GetAtt
-          - RancherInstance
-          - PublicDnsName
-        - ':'
-        - !Ref RancherPort
+    Value: !Sub 'http://${RancherInstance.PublicDnsName}:${RancherPort}'
   RancherIP:
     Description: Public IP of the Rancher server
     Value: !Ref IPAddress
   S3BucketURL:
     Description: URL of the S3 bucket
-    Value: !Join
-      - ''
-      - - 'https://'
-        - !GetAtt
-          - Bucket
-          - DomainName
+    Value: !Sub 'https://${Bucket.DomainName}'
   S3BucketAccessKey:
     Description: Access key of the S3 bucket user
     Value: !Ref BucketKey
@@ -375,15 +317,4 @@ Outputs:
     Value: !Sub '${FileSystem}.efs.${AWS::Region}.${AWS::URLSuffix}'
   DBConnectionString:
     Description: Database connection string for the master database
-    Value: !Join
-      - ''
-      - - 'mysql://'
-        - !GetAtt
-          - DatabaseMasterInstance
-          - Endpoint.Address
-        - ':'
-        - !GetAtt
-          - DatabaseMasterInstance
-          - Endpoint.Port
-        - /
-        - !Ref DatabaseName
+    Value: !Sub 'mysql://${DatabaseMasterInstance.Endpoint.Address}:${DatabaseMasterInstance.Endpoint.Port}/${DatabaseName}'
