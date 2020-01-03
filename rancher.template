@@ -88,16 +88,6 @@
             ],
             "ConstraintDescription": "must select a valid database instance type."
         },
-        "DeletionProtection": {
-            "Description": "The value whether deletion protection is enabled for database and Rancher server",
-            "Type": "String",
-            "Default": true,
-            "AllowedValues": [
-                true,
-                false
-            ],
-            "ConstraintDescription": "must contain a false or true"
-        },
         "BucketName": {
             "Description": "The name of the bucket",
             "Type": "String",
@@ -177,80 +167,19 @@
         "RancherInstance": {
             "Type": "AWS::EC2::Instance",
             "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
                 "UserData": {
                     "Fn::Base64": {
-                        "Fn::Join": [
-                            "",
-                            [
-                                "#cloud-config\n",
-                                "rancher:\n",
-                                "write_files:\n",
-                                "- path: /etc/rc.local\n",
-                                "  permissions: \"0755\"\n",
-                                "  owner: root\n",
-                                "  content: |\n",
-                                "    #!/bin/bash\n",
-                                "    wait-for-docker\n",
-                                {
-                                    "Fn::Join": [
-                                        " ",
-                                        [
-                                            "    docker run -d -p",
-                                            {
-                                                "Fn::Join": [
-                                                    ":",
-                                                    [
-                                                        {
-                                                            "Ref": "RancherPort"
-                                                        },
-                                                        "8080"
-                                                    ]
-                                                ]
-                                            },
-                                            "--name rancher-server",
-                                            "--restart=unless-stopped",
-                                            {
-                                                "Fn::Join": [
-                                                    ":",
-                                                    [
-                                                        "rancher/server",
-                                                        {
-                                                            "Ref": "RancherVersion"
-                                                        }
-                                                    ]
-                                                ]
-                                            },
-                                            "--db-pass",
-                                            {
-                                                "Ref": "DatabaseAdminPassword"
-                                            },
-                                            "--db-user",
-                                            {
-                                                "Ref": "DatabaseAdminUser"
-                                            },
-                                            "--db-name",
-                                            {
-                                                "Ref": "DatabaseName"
-                                            },
-                                            "--db-port",
-                                            {
-                                                "Fn::GetAtt": [
-                                                    "DatabaseMasterInstance",
-                                                    "Endpoint.Port"
-                                                ]
-                                            },
-                                            "--db-host",
-                                            {
-                                                "Fn::GetAtt": [
-                                                    "DatabaseMasterInstance",
-                                                    "Endpoint.Address"
-                                                ]
-                                            }
-                                        ]
-                                    ]
-                                }
-                            ]
-                        ]
+                        "Fn::Sub": "#cloud-config\nrancher:\nwrite_files:\n- path: /etc/rc.local\n  permissions: \"0755\"\n  owner: root\n  content: |\n    #!/bin/bash\n    wait-for-docker\n    docker run -d -p ${RancherPort}:8080 --name rancher-server --restart=unless-stopped rancher/server:${RancherVersion} --db-pass ${DatabaseAdminPassword} --db-user ${DatabaseAdminUser} --db-name ${DatabaseName} --db-port ${DatabaseMasterInstance.Endpoint.Port} --db-host ${DatabaseMasterInstance.Endpoint.Address}\n"
                     }
                 },
                 "InstanceType": {
@@ -292,10 +221,7 @@
                             "DeleteOnTermination": true
                         }
                     }
-                ],
-                "DisableApiTermination": {
-                    "Ref": "DeletionProtection"
-                }
+                ]
             }
         },
         "RancherSecurityGroup": {
@@ -414,9 +340,6 @@
                 "EngineVersion": 5.7,
                 "StorageEncrypted": true,
                 "StorageType": "gp2",
-                "DeletionProtection": {
-                    "Ref": "DeletionProtection"
-                },
                 "DBName": {
                     "Ref": "DatabaseName"
                 },
@@ -433,7 +356,7 @@
                     "Ref": "DatabaseInstanceClass"
                 },
                 "DBInstanceIdentifier": {
-                    "Fn::Sub": "${AWS::StackName}-rancher"
+                    "Ref": "AWS::StackName"
                 },
                 "VPCSecurityGroups": [
                     {
@@ -503,7 +426,9 @@
         "BucketUser": {
             "Type": "AWS::IAM::User",
             "Properties": {
-                "UserName": "bucket",
+                "UserName": {
+                    "Fn::Sub": "${AWS::StackName}-bucket"
+                },
                 "Groups": [
                     {
                         "Ref": "BucketGroup"
@@ -528,7 +453,7 @@
                     {
                         "Key": "Name",
                         "Value": {
-                            "Fn::Sub": "${AWS::StackName}-rancher"
+                            "Ref": "AWS::StackName"
                         }
                     }
                 ],
@@ -544,22 +469,7 @@
         "RancherURL": {
             "Description": "URL of the Rancher server",
             "Value": {
-                "Fn::Join": [
-                    "",
-                    [
-                        "http://",
-                        {
-                            "Fn::GetAtt": [
-                                "RancherInstance",
-                                "PublicDnsName"
-                            ]
-                        },
-                        ":",
-                        {
-                            "Ref": "RancherPort"
-                        }
-                    ]
-                ]
+                "Fn::Sub": "http://${RancherInstance.PublicDnsName}:${RancherPort}"
             }
         },
         "RancherIP": {
@@ -571,18 +481,7 @@
         "S3BucketURL": {
             "Description": "URL of the S3 bucket",
             "Value": {
-                "Fn::Join": [
-                    "",
-                    [
-                        "https://",
-                        {
-                            "Fn::GetAtt": [
-                                "Bucket",
-                                "DomainName"
-                            ]
-                        }
-                    ]
-                ]
+                "Fn::Sub": "https://${Bucket.DomainName}"
             }
         },
         "S3BucketAccessKey": {
@@ -609,29 +508,7 @@
         "DBConnectionString": {
             "Description": "Database connection string for the master database",
             "Value": {
-                "Fn::Join": [
-                    "",
-                    [
-                        "mysql://",
-                        {
-                            "Fn::GetAtt": [
-                                "DatabaseMasterInstance",
-                                "Endpoint.Address"
-                            ]
-                        },
-                        ":",
-                        {
-                            "Fn::GetAtt": [
-                                "DatabaseMasterInstance",
-                                "Endpoint.Port"
-                            ]
-                        },
-                        "/",
-                        {
-                            "Ref": "DatabaseName"
-                        }
-                    ]
-                ]
+                "Fn::Sub": "mysql://${DatabaseMasterInstance.Endpoint.Address}:${DatabaseMasterInstance.Endpoint.Port}/${DatabaseName}"
             }
         }
     }
