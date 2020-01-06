@@ -295,12 +295,18 @@ Resources:
       ProvisionedThroughputInMibps: !Ref FileSystemThroughput
       ThroughputMode: provisioned
 Outputs:
-  RancherURL:
-    Description: URL of the Rancher server
+  RancherPublicURL:
+    Description: Public URL of the Rancher server
     Value: !Sub 'http://${RancherInstance.PublicDnsName}:${RancherPort}'
-  RancherIP:
+  RancherPrivateURL:
+    Description: Private URL of the Rancher server
+    Value: !Sub 'http://${RancherInstance.PrivateDnsName}:${RancherPort}'
+  RancherPublicIP:
     Description: Public IP of the Rancher server
-    Value: !Ref IPAddress
+    Value: !Sub '${RancherInstance.PublicIp}'
+  RancherPrivateIP:
+    Description: Private IP of the Rancher server
+    Value: !Sub '${RancherInstance.PrivateIp}'
   S3BucketURL:
     Description: URL of the S3 bucket
     Value: !Sub 'https://${Bucket.DomainName}'
