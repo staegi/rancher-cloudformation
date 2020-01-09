@@ -103,6 +103,14 @@
             "MinValue": "1",
             "MaxValue": "1024",
             "ConstraintDescription": "must be between 1 and 1024 MiB/s."
+        },
+        "IPBlock": {
+            "Description": "The IP block of the network",
+            "Type": "Number",
+            "Default": "0",
+            "MinValue": "0",
+            "MaxValue": "254",
+            "ConstraintDescription": "must be between 0 and 254."
         }
     },
     "Mappings": {
@@ -164,6 +172,206 @@
         }
     },
     "Resources": {
+        "Network": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Fn::Sub": "10.${IPBlock}.0.0/16"
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackId"
+                        }
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ],
+                "EnableDnsSupport": true,
+                "EnableDnsHostnames": true
+            }
+        },
+        "SubnetA": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "CidrBlock": {
+                    "Fn::Sub": "10.${IPBlock}.0.0/20"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName}-a"
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "Network"
+                }
+            }
+        },
+        "SubnetB": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "CidrBlock": {
+                    "Fn::Sub": "10.${IPBlock}.16.0/20"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        1,
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName}-b"
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "Network"
+                }
+            }
+        },
+        "SubnetC": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "CidrBlock": {
+                    "Fn::Sub": "10.${IPBlock}.32.0/20"
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        2,
+                        {
+                            "Fn::GetAZs": {
+                                "Ref": "AWS::Region"
+                            }
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${AWS::StackName}-c"
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "Network"
+                }
+            }
+        },
+        "RouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "Network"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+        "RouteTableAssocSubnetA": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetA"
+                }
+            }
+        },
+        "RouteTableAssocSubnetB": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetB"
+                }
+            }
+        },
+        "RouteTableAssocSubnetC": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "RouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetC"
+                }
+            }
+        },
+        "NetworkGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "Network"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+        "InternetGatewayRoute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "RouteTableId": {
+                    "Ref": "RouteTable"
+                },
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
         "RancherInstance": {
             "Type": "AWS::EC2::Instance",
             "Properties": {
@@ -185,9 +393,9 @@
                 "InstanceType": {
                     "Ref": "RancherInstanceType"
                 },
-                "SecurityGroups": [
+                "SecurityGroupIds": [
                     {
-                        "Ref": "RancherSecurityGroup"
+                        "Fn::Sub": "${RancherSecurityGroup.GroupId}"
                     }
                 ],
                 "KeyName": {
@@ -221,13 +429,16 @@
                             "DeleteOnTermination": true
                         }
                     }
-                ]
+                ],
+                "SubnetId": {
+                    "Ref": "SubnetA"
+                }
             }
         },
         "RancherSecurityGroup": {
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
-                "GroupDescription": "Rancher",
+                "GroupDescription": "Security group for Rancher",
                 "Tags": [
                     {
                         "Key": "Name",
@@ -280,14 +491,99 @@
                         "FromPort": "443",
                         "ToPort": "443",
                         "CidrIp": "0.0.0.0/0"
-                    },
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "Network"
+                }
+            }
+        },
+        "RancherGroup": {
+            "Type": "AWS::IAM::Group"
+        },
+        "RancherPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": {
+                    "Fn::Sub": "AmazonEC2RancherAccess"
+                },
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ec2:RunInstances"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}::image/ami-*"
+                                },
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                                },
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:placement-group/*"
+                                },
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:volume/*"
+                                },
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/*"
+                                },
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:key-pair/*"
+                                },
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*"
+                                },
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/*"
+                                }
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ec2:RebootInstances",
+                                "ec2:TerminateInstances",
+                                "ec2:StartInstances",
+                                "ec2:StopInstances"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "Groups": [
                     {
-                        "IpProtocol": "tcp",
-                        "FromPort": "2049",
-                        "ToPort": "2049",
-                        "CidrIp": "0.0.0.0/0"
+                        "Ref": "RancherGroup"
                     }
                 ]
+            }
+        },
+        "RancherUser": {
+            "Type": "AWS::IAM::User",
+            "Properties": {
+                "UserName": {
+                    "Fn::Sub": "${AWS::StackName}-rancher"
+                },
+                "Groups": [
+                    {
+                        "Ref": "RancherGroup"
+                    }
+                ]
+            }
+        },
+        "RancherKey": {
+            "Type": "AWS::IAM::AccessKey",
+            "Properties": {
+                "UserName": {
+                    "Ref": "RancherUser"
+                }
             }
         },
         "IPAddress": {
@@ -315,7 +611,7 @@
         "DatabaseSecurityGroup": {
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
-                "GroupDescription": "Database",
+                "GroupDescription": "Security group for relational database",
                 "Tags": [
                     {
                         "Key": "Name",
@@ -329,7 +625,10 @@
                         "ToPort": "3306",
                         "CidrIp": "0.0.0.0/0"
                     }
-                ]
+                ],
+                "VpcId": {
+                    "Ref": "Network"
+                }
             }
         },
         "DatabaseMasterInstance": {
@@ -337,7 +636,7 @@
             "Properties": {
                 "MultiAZ": true,
                 "Engine": "MySQL",
-                "EngineVersion": 5.7,
+                "EngineVersion": "5.7.26",
                 "StorageEncrypted": true,
                 "StorageType": "gp2",
                 "DBName": {
@@ -358,16 +657,40 @@
                 "DBInstanceIdentifier": {
                     "Ref": "AWS::StackName"
                 },
+                "DBSubnetGroupName": {
+                    "Ref": "DatabaseSubnetGroup"
+                },
                 "VPCSecurityGroups": [
                     {
-                        "Fn::GetAtt": [
-                            "DatabaseSecurityGroup",
-                            "GroupId"
-                        ]
+                        "Fn::Sub": "${DatabaseSecurityGroup.GroupId}"
                     }
-                ]
+                ],
+                "CACertificateIdentifier": "rds-ca-2019",
+                "PubliclyAccessible": true
             },
             "DeletionPolicy": "Snapshot"
+        },
+        "DatabaseSubnetGroup": {
+            "Type": "AWS::RDS::DBSubnetGroup",
+            "Properties": {
+                "DBSubnetGroupDescription": {
+                    "Fn::Sub": "Subnet group of the ${AWS::StackName} stack"
+                },
+                "DBSubnetGroupName": {
+                    "Ref": "AWS::StackName"
+                },
+                "SubnetIds": [
+                    {
+                        "Ref": "SubnetA"
+                    },
+                    {
+                        "Ref": "SubnetB"
+                    },
+                    {
+                        "Ref": "SubnetC"
+                    }
+                ]
+            }
         },
         "Bucket": {
             "Type": "AWS::S3::Bucket",
@@ -463,6 +786,139 @@
                 },
                 "ThroughputMode": "provisioned"
             }
+        },
+        "MountTargetA": {
+            "Type": "AWS::EFS::MountTarget",
+            "Properties": {
+                "FileSystemId": {
+                    "Ref": "FileSystem"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetA"
+                },
+                "SecurityGroups": [
+                    {
+                        "Fn::Sub": "${MountTargetSecurityGroup.GroupId}"
+                    }
+                ]
+            }
+        },
+        "MountTargetB": {
+            "Type": "AWS::EFS::MountTarget",
+            "Properties": {
+                "FileSystemId": {
+                    "Ref": "FileSystem"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetB"
+                },
+                "SecurityGroups": [
+                    {
+                        "Fn::Sub": "${MountTargetSecurityGroup.GroupId}"
+                    }
+                ]
+            }
+        },
+        "MountTargetC": {
+            "Type": "AWS::EFS::MountTarget",
+            "Properties": {
+                "FileSystemId": {
+                    "Ref": "FileSystem"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetC"
+                },
+                "SecurityGroups": [
+                    {
+                        "Fn::Sub": "${MountTargetSecurityGroup.GroupId}"
+                    }
+                ]
+            }
+        },
+        "MountTargetSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group for file system mount target",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Filesystem"
+                    }
+                ],
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "2049",
+                        "ToPort": "2049",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "Network"
+                }
+            }
+        },
+        "BitbucketGroup": {
+            "Type": "AWS::IAM::Group"
+        },
+        "BitbucketPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": {
+                    "Fn::Sub": "AmazonECRBitbucketAccess"
+                },
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ecr:GetAuthorizationToken"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ecr:PutImage",
+                                "ecr:BatchCheckLayerAvailability",
+                                "ecr:CompleteLayerUpload",
+                                "ecr:UploadLayerPart",
+                                "ecr:InitiateLayerUpload"
+                            ],
+                            "Resource": {
+                                "Fn::Sub": "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*"
+                            }
+                        }
+                    ]
+                },
+                "Groups": [
+                    {
+                        "Ref": "BitbucketGroup"
+                    }
+                ]
+            }
+        },
+        "BitbucketUser": {
+            "Type": "AWS::IAM::User",
+            "Properties": {
+                "UserName": {
+                    "Fn::Sub": "${AWS::StackName}-bitbucket"
+                },
+                "Groups": [
+                    {
+                        "Ref": "BitbucketGroup"
+                    }
+                ]
+            }
+        },
+        "BitbucketKey": {
+            "Type": "AWS::IAM::AccessKey",
+            "Properties": {
+                "UserName": {
+                    "Ref": "BitbucketUser"
+                }
+            }
         }
     },
     "Outputs": {
@@ -490,6 +946,30 @@
                 "Fn::Sub": "${RancherInstance.PrivateIp}"
             }
         },
+        "RancherAccessKey": {
+            "Description": "Access key of the rancher user to run EC2 instances",
+            "Value": {
+                "Ref": "RancherKey"
+            }
+        },
+        "RancherSecretKey": {
+            "Description": "Secret key of the rancher user to run EC2 instances",
+            "Value": {
+                "Fn::Sub": "${RancherKey.SecretAccessKey}"
+            }
+        },
+        "BitbucketAccessKey": {
+            "Description": "Access key of the Bitbucket user to access ECR registry",
+            "Value": {
+                "Ref": "BitbucketKey"
+            }
+        },
+        "BitbucketSecretKey": {
+            "Description": "Secret key of the Bitbucket user to access ECR registry",
+            "Value": {
+                "Fn::Sub": "${BitbucketKey.SecretAccessKey}"
+            }
+        },
         "S3BucketURL": {
             "Description": "URL of the S3 bucket",
             "Value": {
@@ -505,16 +985,19 @@
         "S3BucketSecretKey": {
             "Description": "Secret key of the S3 bucket user",
             "Value": {
-                "Fn::GetAtt": [
-                    "BucketKey",
-                    "SecretAccessKey"
-                ]
+                "Fn::Sub": "${BucketKey.SecretAccessKey}"
             }
         },
         "NFSDomain": {
             "Description": "Domain name of the NFS file system",
             "Value": {
                 "Fn::Sub": "${FileSystem}.efs.${AWS::Region}.${AWS::URLSuffix}"
+            }
+        },
+        "RegistryDomain": {
+            "Description": "Domain name of the ECR registry",
+            "Value": {
+                "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.${AWS::URLSuffix}"
             }
         },
         "DBConnectionString": {
