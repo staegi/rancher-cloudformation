@@ -297,18 +297,15 @@ Resources:
           ToPort: '443'
           CidrIp: 0.0.0.0/0
       VpcId: !Ref Network
-  RancherGroup:
-    Type: 'AWS::IAM::Group'
   RancherPolicy:
     Type: 'AWS::IAM::Policy'
     Properties:
-      PolicyName: !Sub AmazonEC2RancherAccess
+      PolicyName: AmazonEC2RunInstances
       PolicyDocument:
         Version: 2012-10-17
         Statement:
           - Effect: Allow
-            Action:
-              - 'ec2:RunInstances'
+            Action: 'ec2:RunInstances'
             Resource:
               - !Sub 'arn:aws:ec2:${AWS::Region}::image/ami-*'
               - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
@@ -324,16 +321,13 @@ Resources:
               - 'ec2:TerminateInstances'
               - 'ec2:StartInstances'
               - 'ec2:StopInstances'
-            Resource:
-              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
-      Groups:
-        - !Ref RancherGroup
+            Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
+      Users:
+        - !Ref RancherUser
   RancherUser:
     Type: 'AWS::IAM::User'
     Properties:
       UserName: !Sub '${AWS::StackName}-rancher'
-      Groups:
-        - !Ref RancherGroup
   RancherKey:
     Type: 'AWS::IAM::AccessKey'
     Properties:
@@ -396,8 +390,6 @@ Resources:
     DeletionPolicy: Retain
     Properties:
       BucketName: !Ref BucketName
-  BucketGroup:
-    Type: 'AWS::IAM::Group'
   BucketPolicy:
     Type: 'AWS::IAM::Policy'
     Properties:
@@ -411,20 +403,17 @@ Resources:
               - 's3:ListAllMyBuckets'
             Resource: '*'
           - Effect: Allow
-            Action:
-              - 's3:ListBuckets'
+            Action: 's3:ListBuckets'
             Resource: !Sub 'arn:aws:s3:::${BucketName}'
           - Effect: Allow
             Action: 's3:*'
             Resource: !Sub 'arn:aws:s3:::${BucketName}/*'
-      Groups:
-        - !Ref BucketGroup
+      Users:
+        - !Ref BucketUser
   BucketUser:
     Type: 'AWS::IAM::User'
     Properties:
       UserName: !Sub '${AWS::StackName}-bucket'
-      Groups:
-        - !Ref BucketGroup
   BucketKey:
     Type: 'AWS::IAM::AccessKey'
     Properties:
@@ -474,18 +463,15 @@ Resources:
         ToPort: '2049'
         CidrIp: 0.0.0.0/0
       VpcId: !Ref Network
-  BitbucketGroup:
-    Type: 'AWS::IAM::Group'
   BitbucketPolicy:
     Type: 'AWS::IAM::Policy'
     Properties:
-      PolicyName: !Sub AmazonECRBitbucketAccess
+      PolicyName: AmazonECRImageUpload
       PolicyDocument:
         Version: 2012-10-17
         Statement:
           - Effect: Allow
-            Action:
-              - 'ecr:GetAuthorizationToken'
+            Action: 'ecr:GetAuthorizationToken'
             Resource: '*'
           - Effect: Allow
             Action:
@@ -495,18 +481,41 @@ Resources:
               - 'ecr:UploadLayerPart'
               - 'ecr:InitiateLayerUpload'
             Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
-      Groups:
-        - !Ref BitbucketGroup
+      Users:
+        - !Ref BitbucketUser
   BitbucketUser:
     Type: 'AWS::IAM::User'
     Properties:
       UserName: !Sub '${AWS::StackName}-bitbucket'
-      Groups:
-        - !Ref BitbucketGroup
   BitbucketKey:
     Type: 'AWS::IAM::AccessKey'
     Properties:
       UserName: !Ref BitbucketUser
+  CredentialsUpdaterUser:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: !Sub '${AWS::StackName}-credentials-updater'
+  CredentialsUpdaterKey:
+    Type: 'AWS::IAM::AccessKey'
+    Properties:
+      UserName: !Ref CredentialsUpdaterUser
+  CredentialsUpdaterPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: AmazonECRImagePull
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: 'ecr:GetAuthorizationToken'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'ecr:BatchGetImage'
+              - 'ecr:GetDownloadUrlForLayer'
+            Resource: !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*'
+      Users:
+        - !Ref CredentialsUpdaterUser
 Outputs:
   RancherPublicURL:
     Description: Public URL of the Rancher server
@@ -526,6 +535,12 @@ Outputs:
   RancherSecretKey:
     Description: Secret key of the rancher user to run EC2 instances
     Value: !Sub '${RancherKey.SecretAccessKey}'
+  CredentialsUpdaterAccessKey:
+    Description: Access key of the credentials updater user to get auth token
+    Value: !Ref CredentialsUpdaterKey
+  CredentialsUpdaterSecretKey:
+    Description: Secret key of the credentials updater user to get auth token
+    Value: !Sub '${CredentialsUpdaterKey.SecretAccessKey}'
   BitbucketAccessKey:
     Description: Access key of the Bitbucket user to access ECR registry
     Value: !Ref BitbucketKey
