@@ -450,31 +450,36 @@
                         "IpProtocol": "tcp",
                         "FromPort": "22",
                         "ToPort": "22",
-                        "CidrIp": "0.0.0.0/0"
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "SSH"
                     },
                     {
                         "IpProtocol": "tcp",
                         "FromPort": "2376",
                         "ToPort": "2376",
-                        "CidrIp": "0.0.0.0/0"
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "Docker daemon"
                     },
                     {
-                        "IpProtocol": "tcp",
+                        "IpProtocol": "udp",
                         "FromPort": "500",
                         "ToPort": "500",
-                        "CidrIp": "0.0.0.0/0"
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "Rancher machine"
                     },
                     {
-                        "IpProtocol": "tcp",
+                        "IpProtocol": "udp",
                         "FromPort": "4500",
                         "ToPort": "4500",
-                        "CidrIp": "0.0.0.0/0"
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "Rancher machine"
                     },
                     {
                         "IpProtocol": "tcp",
                         "FromPort": "80",
                         "ToPort": "80",
-                        "CidrIp": "0.0.0.0/0"
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "Non-SSL web"
                     },
                     {
                         "IpProtocol": "tcp",
@@ -484,13 +489,22 @@
                         "ToPort": {
                             "Ref": "RancherPort"
                         },
-                        "CidrIp": "0.0.0.0/0"
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "Non-SSL web"
                     },
                     {
                         "IpProtocol": "tcp",
                         "FromPort": "443",
                         "ToPort": "443",
-                        "CidrIp": "0.0.0.0/0"
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "SSL web"
+                    },
+                    {
+                        "IpProtocol": "icmp",
+                        "FromPort": "-1",
+                        "ToPort": "-1",
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "Ping"
                     }
                 ],
                 "VpcId": {
@@ -498,23 +512,29 @@
                 }
             }
         },
-        "RancherGroup": {
-            "Type": "AWS::IAM::Group"
-        },
         "RancherPolicy": {
             "Type": "AWS::IAM::Policy",
             "Properties": {
-                "PolicyName": {
-                    "Fn::Sub": "AmazonEC2RancherAccess"
-                },
+                "PolicyName": "AmazonEC2RunInstances",
                 "PolicyDocument": {
                     "Version": "2012-10-17",
                     "Statement": [
                         {
                             "Effect": "Allow",
                             "Action": [
-                                "ec2:RunInstances"
+                                "ec2:AuthorizeSecurityGroupIngress",
+                                "ec2:Describe*",
+                                "ec2:ImportKeyPair",
+                                "ec2:CreateKeyPair",
+                                "ec2:CreateSecurityGroup",
+                                "ec2:CreateTags",
+                                "ec2:DeleteKeyPair"
                             ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": "ec2:RunInstances",
                             "Resource": [
                                 {
                                     "Fn::Sub": "arn:aws:ec2:${AWS::Region}::image/ami-*"
@@ -550,17 +570,15 @@
                                 "ec2:StartInstances",
                                 "ec2:StopInstances"
                             ],
-                            "Resource": [
-                                {
-                                    "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
-                                }
-                            ]
+                            "Resource": {
+                                "Fn::Sub": "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                            }
                         }
                     ]
                 },
-                "Groups": [
+                "Users": [
                     {
-                        "Ref": "RancherGroup"
+                        "Ref": "RancherUser"
                     }
                 ]
             }
@@ -570,12 +588,7 @@
             "Properties": {
                 "UserName": {
                     "Fn::Sub": "${AWS::StackName}-rancher"
-                },
-                "Groups": [
-                    {
-                        "Ref": "RancherGroup"
-                    }
-                ]
+                }
             }
         },
         "RancherKey": {
@@ -701,9 +714,6 @@
                 }
             }
         },
-        "BucketGroup": {
-            "Type": "AWS::IAM::Group"
-        },
         "BucketPolicy": {
             "Type": "AWS::IAM::Policy",
             "Properties": {
@@ -723,9 +733,7 @@
                         },
                         {
                             "Effect": "Allow",
-                            "Action": [
-                                "s3:ListBuckets"
-                            ],
+                            "Action": "s3:ListBuckets",
                             "Resource": {
                                 "Fn::Sub": "arn:aws:s3:::${BucketName}"
                             }
@@ -739,9 +747,9 @@
                         }
                     ]
                 },
-                "Groups": [
+                "Users": [
                     {
-                        "Ref": "BucketGroup"
+                        "Ref": "BucketUser"
                     }
                 ]
             }
@@ -751,12 +759,7 @@
             "Properties": {
                 "UserName": {
                     "Fn::Sub": "${AWS::StackName}-bucket"
-                },
-                "Groups": [
-                    {
-                        "Ref": "BucketGroup"
-                    }
-                ]
+                }
             }
         },
         "BucketKey": {
@@ -858,23 +861,16 @@
                 }
             }
         },
-        "BitbucketGroup": {
-            "Type": "AWS::IAM::Group"
-        },
         "BitbucketPolicy": {
             "Type": "AWS::IAM::Policy",
             "Properties": {
-                "PolicyName": {
-                    "Fn::Sub": "AmazonECRBitbucketAccess"
-                },
+                "PolicyName": "AmazonECRImageUpload",
                 "PolicyDocument": {
                     "Version": "2012-10-17",
                     "Statement": [
                         {
                             "Effect": "Allow",
-                            "Action": [
-                                "ecr:GetAuthorizationToken"
-                            ],
+                            "Action": "ecr:GetAuthorizationToken",
                             "Resource": "*"
                         },
                         {
@@ -892,9 +888,9 @@
                         }
                     ]
                 },
-                "Groups": [
+                "Users": [
                     {
-                        "Ref": "BitbucketGroup"
+                        "Ref": "BitbucketUser"
                     }
                 ]
             }
@@ -904,12 +900,7 @@
             "Properties": {
                 "UserName": {
                     "Fn::Sub": "${AWS::StackName}-bitbucket"
-                },
-                "Groups": [
-                    {
-                        "Ref": "BitbucketGroup"
-                    }
-                ]
+                }
             }
         },
         "BitbucketKey": {
@@ -918,6 +909,53 @@
                 "UserName": {
                     "Ref": "BitbucketUser"
                 }
+            }
+        },
+        "CredentialsUpdaterUser": {
+            "Type": "AWS::IAM::User",
+            "Properties": {
+                "UserName": {
+                    "Fn::Sub": "${AWS::StackName}-credentials-updater"
+                }
+            }
+        },
+        "CredentialsUpdaterKey": {
+            "Type": "AWS::IAM::AccessKey",
+            "Properties": {
+                "UserName": {
+                    "Ref": "CredentialsUpdaterUser"
+                }
+            }
+        },
+        "CredentialsUpdaterPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "AmazonECRImagePull",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "ecr:GetAuthorizationToken",
+                            "Resource": "*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ecr:BatchGetImage",
+                                "ecr:GetDownloadUrlForLayer"
+                            ],
+                            "Resource": {
+                                "Fn::Sub": "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*"
+                            }
+                        }
+                    ]
+                },
+                "Users": [
+                    {
+                        "Ref": "CredentialsUpdaterUser"
+                    }
+                ]
             }
         }
     },
@@ -956,6 +994,18 @@
             "Description": "Secret key of the rancher user to run EC2 instances",
             "Value": {
                 "Fn::Sub": "${RancherKey.SecretAccessKey}"
+            }
+        },
+        "CredentialsUpdaterAccessKey": {
+            "Description": "Access key of the credentials updater user to get auth token",
+            "Value": {
+                "Ref": "CredentialsUpdaterKey"
+            }
+        },
+        "CredentialsUpdaterSecretKey": {
+            "Description": "Secret key of the credentials updater user to get auth token",
+            "Value": {
+                "Fn::Sub": "${CredentialsUpdaterKey.SecretAccessKey}"
             }
         },
         "BitbucketAccessKey": {

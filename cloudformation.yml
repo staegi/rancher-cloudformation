@@ -272,30 +272,42 @@ Resources:
           FromPort: '22'
           ToPort: '22'
           CidrIp: 0.0.0.0/0
+          Description: SSH
         - IpProtocol: tcp
           FromPort: '2376'
           ToPort: '2376'
           CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
+          Description: Docker daemon
+        - IpProtocol: udp
           FromPort: '500'
           ToPort: '500'
           CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
+          Description: Rancher machine
+        - IpProtocol: udp
           FromPort: '4500'
           ToPort: '4500'
           CidrIp: 0.0.0.0/0
+          Description: Rancher machine
         - IpProtocol: tcp
           FromPort: '80'
           ToPort: '80'
           CidrIp: 0.0.0.0/0
+          Description: Non-SSL web
         - IpProtocol: tcp
           FromPort: !Ref RancherPort
           ToPort: !Ref RancherPort
           CidrIp: 0.0.0.0/0
+          Description: Non-SSL web
         - IpProtocol: tcp
           FromPort: '443'
           ToPort: '443'
           CidrIp: 0.0.0.0/0
+          Description: SSL web
+        - IpProtocol: icmp
+          FromPort: '-1'
+          ToPort: '-1'
+          CidrIp: 0.0.0.0/0
+          Description: Ping
       VpcId: !Ref Network
   RancherPolicy:
     Type: 'AWS::IAM::Policy'
