@@ -303,6 +303,16 @@ Resources:
           ToPort: '443'
           CidrIp: 0.0.0.0/0
           Description: SSL web
+        - IpProtocol: tcp
+          FromPort: '389'
+          ToPort: '389'
+          CidrIp: 0.0.0.0/0
+          Description: LDAP
+        - IpProtocol: tcp
+          FromPort: '636'
+          ToPort: '636'
+          CidrIp: 0.0.0.0/0
+          Description: LDAPS
         - IpProtocol: icmp
           FromPort: '-1'
           ToPort: '-1'
